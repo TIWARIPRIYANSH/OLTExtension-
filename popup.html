@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OLTHelper</title>
+  <style>
+    body {
+      width: 300px;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 10px;
+    }
+    button {
+      width: 90%;
+      padding: 12px;
+      font-size: 16px;
+      background-color: #4285F4;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #357ae8;
+    }
+    .display-area {
+      text-align: left;
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f1f1f1;
+      border-radius: 5px;
+      min-height: 50px;
+      word-wrap: break-word;
+    }
+    h4 {
+      margin-bottom: 5px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <h3>OLTHelper</h3>
+  <button id="findQuestionBtn">Find Question & Answer</button>
+
+  <div id="questionDisplay" class="display-area" style="display:none;">
+    <h4>Extracted Question:</h4>
+    <p id="questionText"></p>
+  </div>
+  
+  <div id="answerDisplay" class="display-area" style="display:none;">
+    <h4>Answer:</h4>
+    <p id="answerText"></p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
