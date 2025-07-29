@@ -3,7 +3,6 @@
 // IMPORTANT: Replace this with your actual Google AI API key.
 const API_KEY = process.env.API_KEY;
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
-
 // This function formats the data and calls the AI API.
 async function fetchAiAnswer(questionData) {
   // Create a clear prompt for the AI.
