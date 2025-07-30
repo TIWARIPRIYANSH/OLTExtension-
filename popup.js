@@ -1,34 +1,40 @@
-// Wait for the popup's HTML to be fully loaded before running the script.
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Function to communicate with the  content script and get the question data.
   async function getQuestionFromPage() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const response = await chrome.tabs.sendMessage(tab.id, { action: "extractQuestionData" });
-    return response;
+
+    const injectionResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      files: ['content.js']
+    });
+
+    for (const frameResult of injectionResults) {
+      if (frameResult.result) {
+        return frameResult.result;
+      }
+    }
+    return null;
   }
 
-  // Main execution starts when the popup button is clicked.
   document.getElementById('findQuestionBtn').addEventListener('click', async () => {
-    const questionDisplay = document.getElementById('questionDisplay');
-    const questionTextElem = document.getElementById('questionText');
     const answerDisplay = document.getElementById('answerDisplay');
     const answerTextElem = document.getElementById('answerText');
 
-    questionDisplay.style.display = 'none';
     answerDisplay.style.display = 'block';
     answerTextElem.innerText = 'Extracting question...';
 
     try {
       const extractedData = await getQuestionFromPage();
 
-      if (extractedData && extractedData.error) {
+      if (!extractedData) {
+        throw new Error("Could not find the question data in any frame.");
+      }
+      
+      if (extractedData.error) {
         throw new Error(extractedData.error);
       }
 
-      if (extractedData && extractedData.question) {
-        questionTextElem.innerText = extractedData.question;
-        questionDisplay.style.display = 'block';
+      if (extractedData.question) {
         answerTextElem.innerText = 'Asking AI... 🤔';
 
         const aiResponse = await chrome.runtime.sendMessage({
@@ -39,15 +45,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (aiResponse && aiResponse.answer) {
           answerTextElem.innerText = aiResponse.answer;
         } else {
-          throw new Error("No answer received from AI.");
+          throw new Error(aiResponse.error || "No valid answer received from AI.");
         }
       } else {
-        throw new Error("Could not extract question from the page (unexpected response).");
+        throw new Error("Extraction failed: no question text found.");
       }
     } catch (error) {
       console.error("An error occurred:", error);
       answerTextElem.innerText = `Error: ${error.message}`;
-      answerDisplay.style.display = 'block';
     }
   });
 

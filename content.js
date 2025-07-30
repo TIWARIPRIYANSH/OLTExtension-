@@ -1,53 +1,34 @@
-// Function to communicate with the content script and get the question data.
-async function getQuestionFromPage() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const response = await chrome.tabs.sendMessage(tab.id, { action: "extractQuestionData" });
-  return response;
+function extractQuestionData() {
+  // This function only runs if it's inside a frame.
+  // It looks for the question content within its current document context.
+  const allQuestionContainers = document.querySelectorAll('div.Question');
+  let visibleContainer = null;
+  
+  for (const container of allQuestionContainers) {
+    if (container.offsetParent !== null) {
+      visibleContainer = container;
+      break;
+    }
+  }
+
+  if (!visibleContainer) {
+    // This is not an error, it just means this frame is not the right one.
+    // Return null so the popup knows to check the next frame's result.
+    return null;
+  }
+
+  const questionElement = visibleContainer.querySelector('#lblQuestion');
+  if (!questionElement) {
+    return { error: "Found visible question container, but it's missing '#lblQuestion' inside." };
+  }
+  
+  const fullQuestionText = questionElement.innerText;
+
+  if (!fullQuestionText || fullQuestionText.trim() === '') {
+    return { error: "The visible question container appears to be empty." };
+  }
+
+  return { question: fullQuestionText, options: [] };
 }
 
-// Main execution starts when the popup button is clicked.
-document.getElementById('findQuestionBtn').addEventListener('click', async () => {
-  const questionDisplay = document.getElementById('questionDisplay');
-  const questionTextElem = document.getElementById('questionText');
-  const answerDisplay = document.getElementById('answerDisplay');
-  const answerTextElem = document.getElementById('answerText');
-
-  questionDisplay.style.display = 'none';
-  answerDisplay.style.display = 'block';
-  answerTextElem.innerText = 'Extracting question...';
-
-  try {
-    const extractedData = await getQuestionFromPage();
-
-    // --- THIS IS THE FIX ---
-    // First, check if content.js sent back a specific error.
-    if (extractedData && extractedData.error) {
-      throw new Error(extractedData.error);
-    }
-
-    // If no error, proceed to check for the question.
-    if (extractedData && extractedData.question) {
-      questionTextElem.innerText = extractedData.question;
-      questionDisplay.style.display = 'block';
-      answerTextElem.innerText = 'Asking AI... 🤔';
-
-      const aiResponse = await chrome.runtime.sendMessage({
-        action: "getAiAnswer",
-        data: extractedData
-      });
-
-      if (aiResponse && aiResponse.answer) {
-        answerTextElem.innerText = aiResponse.answer;
-      } else {
-        throw new Error("No answer received from AI.");
-      }
-    } else {
-      // This is now a fallback for unexpected responses.
-      throw new Error("Could not extract question from the page (unexpected response).");
-    }
-  } catch (error) {
-    console.error("An error occurred:", error);
-    answerTextElem.innerText = `Error: ${error.message}`;
-    answerDisplay.style.display = 'block';
-  }
-});
+extractQuestionData();
