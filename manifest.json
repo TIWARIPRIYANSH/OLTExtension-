@@ -1,7 +1,11 @@
 {
   "manifest_version": 3,
   "name": "AI Helper",
-  "version": "1.3",
+  "version": "1.2",
+  "description": "Extracts questions from a page and gets answers.",
+  
+
+
   "permissions": [
     "scripting",
     "activeTab",
@@ -15,5 +19,10 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }

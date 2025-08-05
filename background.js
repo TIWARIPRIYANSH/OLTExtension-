@@ -1,7 +1,9 @@
 // background.js
 
 // IMPORTANT: Replace this with your actual Google AI API key.
-const API_KEY = process.env.GOOGLE_AI_API_KEY;
+
+const API_KEY = process.env.GOOGLE_AI_API_KEY; 
+
 
 // This is the corrected URL with the current model name.
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
@@ -16,6 +18,7 @@ async function fetchAiAnswer(questionData) {
     Question Block:
     ${questionData.question}
   `;
+  console.log(`[${new Date().toLocaleTimeString()}] Making API call to Gemini...`);
 
   try {
     const response = await fetch(API_URL, {
