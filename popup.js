@@ -1,98 +1,93 @@
-// This function will be injected into the page.
-function extractQuestionData() {
-  const allQuestionContainers = document.querySelectorAll('div.Question');
-  let visibleContainer = null;
-  
-  for (const container of allQuestionContainers) {
-    if (container.offsetParent !== null) {
-      visibleContainer = container;
-      break;
-    }
-  }
-
-  if (!visibleContainer) {
-    return null;
-  }
-
-  const questionElement = visibleContainer.querySelector('#lblQuestion');
-  if (!questionElement) {
-    return { error: "Found visible container, but it's missing '#lblQuestion'." };
-  }
-  
-  const imageElement = questionElement.querySelector('img');
-  if (imageElement) {
-    return { error: "Question is an image." };
-  }
-  
-  const fullQuestionText = questionElement.innerText;
-  if (!fullQuestionText || fullQuestionText.trim() === '') {
-    return { error: "The visible question container appears to be empty." };
-  }
-
-  return { question: fullQuestionText, options: [] };
-}
-
-
-// --- Main Extension Logic ---
+// popup.js
 document.addEventListener('DOMContentLoaded', () => {
+  const findBtn = document.getElementById('findQuestionBtn');
+  const resultContainer = document.getElementById('resultContainer');
+  const highlightedAnswerElem = document.getElementById('highlightedAnswer');
+  const explanationElem = document.getElementById('explanationText');
+  const statusTextElem = document.getElementById('statusText');
+  const themeToggle = document.getElementById('themeToggle');
 
-  async function getQuestionFromPage() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  // --- Theme Logic ---
+  chrome.storage.local.get('theme', ({ theme }) => {
+    if (theme === 'dark') {
+      document.body.classList.add('dark-mode');
+      themeToggle.checked = true;
+    }
+  });
+  themeToggle.addEventListener('change', () => {
+    document.body.classList.toggle('dark-mode');
+    chrome.storage.local.set({ theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light' });
+  });
 
-    const injectionResults = await chrome.scripting.executeScript({
-      target: { tabId: tab.id, allFrames: true },
-      func: extractQuestionData
-    });
-
-    for (const frameResult of injectionResults) {
-      if (frameResult.result) {
-        return frameResult.result;
+  // --- Resilient function to send messages with retries ---
+  async function sendMessageWithRetries(tabId, message, retries = 3, delay = 200) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, message);
+        return response;
+      } catch (error) {
+        if (error.message.includes("Receiving end does not exist")) {
+          if (i === retries - 1) { 
+            throw error;
+          }
+          console.log(`Connection failed. Retrying... (${i + 1}/${retries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
       }
     }
-    return null;
   }
 
-  document.getElementById('findQuestionBtn').addEventListener('click', async () => {
-    // --- THIS IS THE CORRECTED PART ---
-    const resultContainer = document.getElementById('resultContainer');
-    const highlightedAnswerElem = document.getElementById('highlightedAnswer');
-    const explanationElem = document.getElementById('explanationText');
-    const statusTextElem = document.getElementById('statusText');
+  // --- Main Execution Logic ---
+  findBtn.addEventListener('click', async () => {
+    // --- INTEGRATED FIX 1: Disable button on click ---
+    findBtn.disabled = true;
+    findBtn.innerText = 'Working...';
+    // ---
 
     resultContainer.style.display = 'none';
     statusTextElem.style.display = 'block';
-    statusTextElem.innerText = 'Extracting question...';
-    // --- End of correction ---
+    statusTextElem.innerText = 'Detecting content...';
 
     try {
-      const extractedData = await getQuestionFromPage();
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const content = await sendMessageWithRetries(tab.id, { action: "findContent" });
 
-      if (!extractedData) throw new Error("Could not find the question data in any frame.");
-      if (extractedData.error) throw new Error(extractedData.error);
+      let requestPayload = {};
 
-      if (extractedData.question) {
-        statusTextElem.innerText = 'Asking AI... 🤔';
-
-        const aiResponse = await chrome.runtime.sendMessage({
-          action: "getAiAnswer",
-          data: extractedData
-        });
-
-        if (aiResponse && aiResponse.answer) {
-          highlightedAnswerElem.innerText = aiResponse.answer;
-          explanationElem.innerText = aiResponse.explanation;
-          resultContainer.style.display = 'block';
-          statusTextElem.style.display = 'none'; 
-        } else {
-          throw new Error(aiResponse.error || "No valid answer received from AI.");
-        }
+      if (content && content.type === 'text') {
+        statusTextElem.innerText = 'Found text. Asking AI...';
+        requestPayload = { type: 'text', data: content.data };
+      } else if (content && content.type === 'image') {
+        statusTextElem.innerText = 'Found image. Asking AI...';
+        requestPayload = { type: 'image', data: content.data, context: content.context };
       } else {
-        throw new Error("Extraction failed: no question text found.");
+        statusTextElem.innerText = 'Nothing specific found. Taking screenshot...';
+        const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: "png" });
+        requestPayload = { type: 'screenshot', data: screenshotDataUrl };
+      }
+      
+      const aiResponse = await chrome.runtime.sendMessage({ action: "getAiAnswer", payload: requestPayload });
+      
+      if (aiResponse.error) throw new Error(aiResponse.error);
+
+      if (aiResponse && aiResponse.answer) {
+        highlightedAnswerElem.innerText = aiResponse.answer;
+        explanationElem.innerText = aiResponse.explanation;
+        resultContainer.style.display = 'block';
+        statusTextElem.style.display = 'none';
+      } else {
+        throw new Error("Received an invalid response from the AI.");
       }
     } catch (error) {
       console.error("An error occurred:", error);
       statusTextElem.innerText = `Error: ${error.message}`;
+    } finally {
+      // --- INTEGRATED FIX 2: Re-enable button when done ---
+      findBtn.disabled = false;
+      findBtn.innerText = 'Find Answer';
+      // ---
     }
   });
-
 });
