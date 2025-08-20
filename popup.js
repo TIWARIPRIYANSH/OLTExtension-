@@ -41,10 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Main Execution Logic ---
   findBtn.addEventListener('click', async () => {
-    // --- INTEGRATED FIX 1: Disable button on click ---
+  
     findBtn.disabled = true;
     findBtn.innerText = 'Working...';
-    // ---
+
 
     resultContainer.style.display = 'none';
     statusTextElem.style.display = 'block';
@@ -84,10 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error("An error occurred:", error);
       statusTextElem.innerText = `Error: ${error.message}`;
     } finally {
-      // --- INTEGRATED FIX 2: Re-enable button when done ---
+   
       findBtn.disabled = false;
       findBtn.innerText = 'Find Answer';
-      // ---
+
     }
   });
+
 });
